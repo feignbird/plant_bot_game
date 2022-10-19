@@ -319,15 +319,15 @@ def make_game_body(canv_width = 500, canv_height = 500):
     try:
         document['container'].remove()
     except:
-        print("Error")
+        print("Making the Game....")
     
     # adding buttons
     information = """\
 Note:
     Write "fwd()" to move forward in the direction where head of pointer is pointing.
     Write "r_cw()" to rotate on place in clockwise direction.
-    Write "r_ccw()" to rotate on place in counter clockwise direction.<br>
-    Write "plant()" to plant on the box to make it green and get a point.<br>
+    Write "r_ccw()" to rotate on place in counter clockwise direction.
+    Write "plant()" to plant on the box to make it green and get a point.
     
     1. click on run button to create a new game.
     2. click start button to start the animation after writing down code
@@ -933,6 +933,7 @@ def stop_interval(event = None, end_coord = None):
         reset(end_coord)
     else:
         reset()
+    document['start_interval'].style.display = "inline"
 
 # @bind("#new_game", 'click')
 # def new_game(event = None):

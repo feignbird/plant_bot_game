@@ -396,22 +396,24 @@ Note:
     
     # adding a sub-editor for bry-bot game
     sub_editor_div = html.DIV(id = "bry-bot-editor", style={
-        "width" : "100%",
-        "height" : "100%"
+        "width" : f"100%",
+        "height" : f"{canv_height}px"
     })
     sub_editor_div <= html.TEXTAREA(id = "sub-text-area", style = {
         'width':"100%", 
         "height":"100%", 
-        'font-size':"20px"
-        
+        'font-size':"20px",
+        "border-radius" : "5px",
+        "padding" : "10px"
     })
     game_playground <= sub_editor_div
     
     # adding a main div in which a canvas reside
     main_div = html.DIV(id="main_div")
     main_canvas = html.CANVAS(id = "main_canvas", width = f"{canv_width}px", height = f"{canv_height}px", style = {
-        'border':"1px solid #000000"
-        
+        'border':"1px solid #000000",
+        "display" : "flex",
+        "border-radius" : "5px"
     })
     main_div <= main_canvas
 

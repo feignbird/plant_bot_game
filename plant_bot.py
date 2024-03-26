@@ -681,11 +681,11 @@ def plant():
         red_box_only_coord = list(map(lambda a: [a[0], a[1]], red_box_coord))
         
         if [current_gx, current_gy] in red_box_only_coord and not [current_gx, current_gy] in self.planted_boxes:
-            document.getElementById('score_number').innerHTML = int(str(document.getElementById('score_number').innerHTML).strip())+1
+            document.getElementById('score_number').innerHTML = abs(int(str(document.getElementById('score_number').innerHTML).strip())+1)
             self.planted_boxes.append([current_gx, current_gy])
             return True
         else:
-            document.getElementById('score_number').innerHTML = int(str(document.getElementById('score_number').innerHTML).strip())-1
+            document.getElementById('score_number').innerHTML = abs(int(str(document.getElementById('score_number').innerHTML).strip())-1)
             return False
     
 

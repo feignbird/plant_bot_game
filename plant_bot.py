@@ -10,12 +10,13 @@ from itertools import chain
 from browser import document, html, window as win, bind, timer, ajax, console
 from browser.session_storage import storage
 
-SHOW_PROGRAM = False
+WRITE_SUBOPTIMAL_PROGRAM = True
+GAME_LEVEL = 1
+SHOW_COORDINATES_ON_CANVAS = False
 
 class PatternGen:
-    def __init__(self, level):
-        self.level, self.direc_map, self.direc_map_rev, self.path_len, self.ctx, self.ground_paras = self.get_level_data(level)
-
+    def __init__(self, level=1):
+        self.level, self.direc_map, self.direc_map_rev, self.path_len, self.ground_paras = self.get_level_data(level)
         self.robot_start_coord, self.current_dir = self.get_start_point()
         self.major_func_list = [self.get_random_cmds, self.get_random_for_block, self.get_random_for_block]#, self.get_random_if_else_block]
         self.start_dir = self.current_dir.strip()
@@ -24,12 +25,11 @@ class PatternGen:
         self.local_path_list = [self.robot_start_coord]
         self.last_direction = []
         self.local_direction = []
-
         self.intersection_threshold = 0
         self.pattern = []
 
     def get_level_data(self, level):
-        LEVEL = level
+        LEVEL = level%6
         PATH_LEN = (10*(2**LEVEL))
         DIREC_MAP = {1:"east", 2:"west", 3:"north", 4:"south"}
         DIREC_MAP_REV = {'east':1, 'west':2, 'north':3, 'south':4}
@@ -44,21 +44,22 @@ class PatternGen:
             main_canvas_width = 1200
             main_canvas_height = 1200
 
-        CTX = None
         GROUND_PARAS = {
             "start_x" : 0,
             "start_y" : 0,
+            "canvas_width" : main_canvas_width,
+            "canvas_height" : main_canvas_height,
             "ground_w" : LEVEL*10,
             "ground_h" : LEVEL*10,
             "stage_w" : main_canvas_width/(LEVEL*10),
             "stage_h" : main_canvas_height/(LEVEL*10),
             "gap" : 0
         }
-        return LEVEL, DIREC_MAP, DIREC_MAP_REV, PATH_LEN, CTX, GROUND_PARAS
+        return LEVEL, DIREC_MAP, DIREC_MAP_REV, PATH_LEN, GROUND_PARAS
 
     def get_start_point(self):
         max_point = (self.ground_paras['ground_h']-1, self.ground_paras['ground_w']-1)
-        points = []
+        # points = []
         boundry_points = []
 
         def get_dir(point = (0, 0)):
@@ -73,7 +74,7 @@ class PatternGen:
 
         for col in range(max_point[1]+1):
             for row in range(max_point[0]+1):
-                points.append((row, col))
+                # points.append((row, col))
                 if col == 0 or row == 0 or col == max_point[1] or row == max_point[0]:
                     boundry_points.append((row, col))
         start_point = random.choice(list(set(boundry_points)))
@@ -290,48 +291,43 @@ class PatternGen:
             print()
 
     def create_pattern(self):
-        util.path_resolver()
-        while util.path_list.__len__() == 0:
-            util.path_resolver()
-        pattern, path, str_list = util.pattern_mapper()
+        self.path_resolver()
+        while self.path_list.__len__() == 0:
+            self.path_resolver()
+        pattern, path, str_list = self.pattern_mapper()
         # util.print_board()
         data = {
             "program" : "\n".join(str_list),
             "path_list" : path,
             "pattern" : pattern,
             "start_coord" : [self.robot_start_coord[0], self.robot_start_coord[1], self.start_dir],
-            "level":self.level
+            "level": self.level
         }
         # print(data)
         return data
-
-util = PatternGen(1) #  <- SET THE LEVEL HERE (ALLOWED levels 1, 2, 3)
 
 try:
     document['get-pattern'].remove()
 except:
     pass
 
-document.body.appendChild(html.SCRIPT(src="https://plant-bot-bucket.s3.ap-south-1.amazonaws.com/plant_bot_patterns.js", id = 'get-pattern'))
+# document.body.appendChild(html.SCRIPT(src="https://plant-bot-bucket.s3.ap-south-1.amazonaws.com/plant_bot_patterns.js", id = 'get-pattern'))
 
-def make_game_body(canv_width = 500, canv_height = 500):
-    clientWidth = document.documentElement.clientWidth
+def build_game_body(canv_width = 500, canv_height = 500):
     try:
         document['container'].remove()
     except:
         print("Making the Game....")
     
     # adding buttons
-    information = """\
-Note:
+    information = """Note:
     Write "fwd()" to move forward in the direction where head of pointer is pointing.
     Write "r_cw()" to rotate on place in clockwise direction.
     Write "r_ccw()" to rotate on place in counter clockwise direction.
     Write "plant()" to plant on the box to make it green and get a point.
     
     1. click on run button to create a new game.
-    2. click start button to start the animation after writing down code
-       in sub editor.
+    2. click start button to start the animation after writing down code in sub editor.
     3. click stop to stop the animation any time.
     4. click reset button to go to starting conditions.
     
@@ -399,13 +395,14 @@ Note:
         "width" : f"100%",
         "height" : f"{canv_height}px"
     })
-    sub_editor_div <= html.TEXTAREA(id = "sub-text-area", style = {
+    sub_editor = html.TEXTAREA(id = "sub-text-area", style = {
         'width':"100%", 
         "height":"100%", 
         'font-size':"20px",
         "border-radius" : "5px",
         "padding" : "10px"
     })
+    sub_editor_div <= sub_editor
     game_playground <= sub_editor_div
     
     # adding a main div in which a canvas reside
@@ -423,68 +420,39 @@ Note:
     game_div.appendChild(game_playground)
     document.body.style.display = "block"
     document.body.appendChild(game_div)
+    return sub_editor
 
-    # info_style = {
-    #     "position": "absolute",
-    #     "width" : "510px",
-    #     "height": "700px",
-    #     "top": str(int(document['container'].style.height[:-2])+100)+"px",
-    #     "left": "1200px",
-    #     "z-index": "3",
-    #     "font-size" : "18px",
-    #     "display" : "none"
-    # }
-    # info = html.P(information, id = "game_info", style = info_style)
-    # document.body.appendChild(info)
 
-def get_level_data():
-    def read_level_and_pattern():
-        level_selected = win.prompt("Choose between level 1, 2 and 3", "Enter level number")
-        try:
-            return random.choice(win.patternObject9689[f'level_{level_selected.strip()}'])
-        except:
-            raise Exception("Pattern file loading error, Try to 'Run' the program again.")
-    
-    # level n -> (10*(2**3))/2
-    # data = read_level_and_pattern()
-    data = util.create_pattern()
+def create_game(level:int=1, canvas_id:str=None):
+    if not canvas_id:
+        raise "Please set the canvas id"
+    pattern_gen_obj = PatternGen(level)
+    PATH_LEN = pattern_gen_obj.path_len
+    DIREC_MAP = pattern_gen_obj.direc_map
+    GROUND_PARAS = pattern_gen_obj.ground_paras
+
+    data = pattern_gen_obj.create_pattern()
     pattern = data['pattern']
     path_list = data['path_list']
     start_coord = data['start_coord']
     program = data['program']
-    if SHOW_PROGRAM:
-        print(program)
-    LEVEL = data['level']
-    
-    PATH_LEN = (10*(2**LEVEL))/2
-    DIREC_MAP = {1:"east", 2:"west", 3:"north", 4:"south"}
-    
-    if LEVEL in [1, 2]:
-        make_game_body(canv_width = 500, canv_height = 500)
-    elif LEVEL in [3, 4]:
-        make_game_body(canv_width = 800, canv_height = 800)
-    elif LEVEL in [5, 6]:
-        make_game_body(canv_width = 1200, canv_height = 1200)
 
-    CTX = document.getElementById('main_canvas').getContext("2d")
-    GROUND_PARAS = {
-        "start_x" : 0,
-        "start_y" : 0,
-        "ground_w" : LEVEL*10,
-        "ground_h" : LEVEL*10,
-        "stage_w" : document['main_canvas'].width/(LEVEL*10),
-        "stage_h" : document['main_canvas'].height/(LEVEL*10),
-        "gap" : 0
-    }
-    return LEVEL, DIREC_MAP, PATH_LEN, CTX, GROUND_PARAS, pattern, path_list, start_coord
+
+    sub_editor = build_game_body(GROUND_PARAS['canvas_width'], GROUND_PARAS['canvas_height'])
+    CTX = document.getElementById(canvas_id).getContext("2d")
+    if WRITE_SUBOPTIMAL_PROGRAM:
+        console.log("sub_editor: ", sub_editor)
+        sub_editor.value = program
+        sub_editor.setSelectionRange(5, 40)
+    return level, DIREC_MAP, PATH_LEN, CTX, GROUND_PARAS, pattern, path_list, start_coord
 
 
 class Utilities:
-    def __init__(self, level, path_len, ground_paras):
+    def __init__(self, level, path_len, ground_paras, start_coord):
         self.ground_paras = ground_paras
         self.path_len = path_len
         self.score = None
-        self.robot_start_coord = None
+        self.robot_start_coord = start_coord
         self.planted_boxes = []
         self.red_box_count = None
         self.path_list = []
@@ -687,9 +655,7 @@ def plant():
         else:
             document.getElementById('score_number').innerHTML = abs(int(str(document.getElementById('score_number').innerHTML).strip())-1)
             return False
-    
 
-    
     def path_generater(self, path_length = None):
         ground_w = self.ground_paras['ground_w']
         ground_h = self.ground_paras['ground_h']
@@ -720,39 +686,38 @@ def plant():
 
 
 class GameObject:
-    DIREC_MAP = {1:"east", 2:"west", 3:"north", 4:"south"}
     CURRENT_DIR = 1
     CURRENT_GX = 0
     CURRENT_GY = 0
-    show_points_on_canvas = True
     
-    def __init__(self, ctx, pattern, util, ground_paras, path_list):
-        self.pattern = pattern
+    def __init__(self, ctx, pattern, util, ground_paras, path_list, direc_map, show_coordinates=False):
         self.ctx = ctx
+        self.pattern = pattern
         self.util = util
         self.ground_paras = ground_paras
         self.path_list = path_list
+        self.direc_map = direc_map
+        self.show_coordinates = show_coordinates
 
         self.cmd_list = []
         self.index = 0
         self._timer = None
         self.coordinate_dict = {}
-        self.no_of_lines_of_code = None
+        self.code_size = None
 
-        self.game_object = document['main_canvas']
-        self.ctx = self.game_object.getContext("2d")
         self.start_x = ground_paras['start_x']
         self.start_y = ground_paras['start_y']
         self.stage_w = ground_paras['stage_w']
         self.stage_h = ground_paras['stage_h']
         self.ground_w = ground_paras['ground_w']
         self.ground_h = ground_paras['ground_h']
+        self.gap = ground_paras['gap']
 
-    def make_ground(self, pattern, ctx, start_x = 0, start_y = 0, ground_w = 3, ground_h = 3, stage_w = 10, stage_h = 10, gap = 1):
-        coord_x = start_x
-        coord_y = start_y
-        for y in range(ground_h):
-            for x in range(ground_w):
+    def make_ground(self, pattern, ctx):
+        coord_x = self.start_x
+        coord_y = self.start_y
+        for y in range(self.ground_h):
+            for x in range(self.ground_w):
                 ctx.fillStyle = "#6A6C69"
                 if pattern[y][x] == 1:
                     ctx.fillStyle = "#87CEEB"
@@ -762,18 +727,19 @@ class GameObject:
                     ctx.fillStyle = "#c2fa8e"
                 elif pattern[y][x] == 4:
                     ctx.fillStyle = "#88ad65"
-                ctx.fillRect(coord_x, coord_y, stage_w, stage_h)
+                ctx.fillRect(coord_x, coord_y, self.stage_w, self.stage_h)
+                ctx.strokeRect(coord_x, coord_y, self.stage_w, self.stage_h)
                 self.coordinate_dict.update({",".join([str(x), str(y)]):[coord_x, coord_y]})
                 
-                if self.show_points_on_canvas:
+                if self.show_coordinates:
                     ctx.fillStyle = "#000000"
                     ctx.textAlign = 'center'
                     ctx.textBaseline = "middle"
-                    ctx.font = "{0}px serif".format(round((stage_w-2)/3))
-                    ctx.fillText(f"({x},{y})", coord_x + (stage_w*(50/100)),coord_y+(stage_w*(50/100)))
-                coord_x += stage_w + gap
-            coord_x = start_x
-            coord_y += stage_h + gap
+                    ctx.font = "{0}px serif".format(round((self.stage_w-2)/3))
+                    ctx.fillText(f"({x},{y})", coord_x + (self.stage_w*(50/100)),coord_y+(self.stage_w*(50/100)))
+                coord_x += self.stage_w + self.gap
+            coord_x = self.start_x
+            coord_y += self.stage_h + self.gap
     
     def get_command_list(self):
         def fwd():
@@ -785,18 +751,24 @@ class GameObject:
         def plant():
             self.cmd_list.append(self.plant)
         
-        game_script = document.getElementById("sub-text-area").value
-        self.no_of_lines_of_code = game_script.split("\n").__len__()
-        #print("locals():", locals(), "| globals():", globals())
-        #exec("print(dir())", locals(), locals())
-        exec(game_script, locals(), locals())
+        sub_editor = document.getElementById("sub-text-area")
+        code = sub_editor.value
+        self.code_size = self.calculate_code_size(code)
+        print("code_size: ", self.code_size)
+        print("locals():", locals(), "| globals():", globals())
+        # exec("print(dir())", locals(), locals())
+        exec(code, locals(), locals())
+        
     
+    def calculate_code_size(self, code:str=None):
+        return len(repr(code).replace(" ", "").replace("\n", ""))
+
     def animate_ground(self):
         # print("animation_index:", self.index)
-        self.make_ground(self.pattern, self.ctx, **self.ground_paras)
-        if self.index >= self.cmd_list.__len__():
+        self.make_ground(self.pattern, self.ctx)
+        if self.index >= len(self.cmd_list):
             self.index = 0
-            end_coord = [self.CURRENT_GX, self.CURRENT_GY, self.DIREC_MAP[self.CURRENT_DIR]]
+            end_coord = [self.CURRENT_GX, self.CURRENT_GY, self.direc_map[self.CURRENT_DIR]]
             stop_interval(end_coord = end_coord)
         else:
             eval('self.cmd_list[self.index]()')
@@ -888,31 +860,29 @@ class GameObject:
     
     def rotate_clockwise(self):
         self.CURRENT_DIR = self.next_direc(current_dir = self.CURRENT_DIR, rotation_type = "cw")
-        self.move_to(self.CURRENT_GX, self.CURRENT_GY, direction = self.DIREC_MAP[self.CURRENT_DIR])
+        self.move_to(self.CURRENT_GX, self.CURRENT_GY, direction = self.direc_map[self.CURRENT_DIR])
     
     def rotate_anti_clockwise(self):
         self.CURRENT_DIR = self.next_direc(current_dir = self.CURRENT_DIR, rotation_type = "ccw")
-        self.move_to(self.CURRENT_GX, self.CURRENT_GY, direction = self.DIREC_MAP[self.CURRENT_DIR])
+        self.move_to(self.CURRENT_GX, self.CURRENT_GY, direction = self.direc_map[self.CURRENT_DIR])
     
     def plant(self):
         if self.util.verify_game_moves(self.CURRENT_GX, self.CURRENT_GY, self.path_list):
             self.pattern[self.CURRENT_GY][self.CURRENT_GX] = 3
         else:
             self.pattern[self.CURRENT_GY][self.CURRENT_GX] = 4
-            
-            
 
 
-level, direc_map, path_len, ctx, ground_paras, pattern, path_list, start_coord = get_level_data()
+
+level, direc_map, path_len, ctx, ground_paras, pattern, path_list, start_coord = create_game(GAME_LEVEL, "main_canvas")
 reset_pattern = copy.deepcopy(pattern)
-util = Utilities(level, path_len, ground_paras)
-util.robot_start_coord = start_coord
-my_robot = GameObject(ctx, pattern, util, ground_paras, path_list)
+util = Utilities(level, path_len, ground_paras, start_coord)
+my_robot = GameObject(ctx, pattern, util, ground_paras, path_list, direc_map, SHOW_COORDINATES_ON_CANVAS)
 
 
 def reset(end_coord = None):
     # print("Reset Hit with pattern", pattern, " and ground_paras ", ground_paras, " and ctx ", ctx, " and start_coord ", start_coord, " and end_coord ", end_coord)
-    my_robot.make_ground(pattern, ctx, **ground_paras)
+    my_robot.make_ground(pattern, ctx)
     if end_coord:
         my_robot.move_to(end_coord[0], end_coord[1], direction = end_coord[2])
     else:
@@ -1018,3 +988,103 @@ def game_reset(event = None):
 # path_list = game_data['path_list']
 # start_coord = game_data['start_coord']
 # level = game_data['level']
+
+
+
+
+
+"""
+canvas creation
+    - board creation 
+        - create cells which have border 
+
+puzzle creation (based on given hash if provided else create own)
+    - random puzzle creation
+
+game object (bot) creation
+    - giving it the starting position of the puzzle
+    - user will only be able to control the bot with following commands
+        - is_plantable() # condition
+        - is_path() # condition
+        - fwd()   # action
+        - r_cw()  # action
+        - r_ccw() # action
+        - plant() # action
+
+Confusion in looking through running program
+
+show total number of characters in the program 
+(we'll compare it to the inherent solution program and give user a satisfaction index)
+
+path should be lengthy and the block should not be adjacent
+
+game should have a score which is computed on the basis of user's code size and total planted block and time usage
+	- levels reached (means on which level user score how much)
+	- code size
+	- planted block out of total
+	- total time usage to complete the game
+
+
+each game will have a unique hash
+
+Create function "is_plantable() and is_path()"
+Now user can use gray any path but it will decrease points
+
+Moving on specified path will increase points per move
+ 
+Planting gives extra points 
+
+Length of code will determine points should increase or decrease - lengthy the code less the points
+
+Create a hash of a particular game that user can share and run to create exact same puzzle
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+IDEALS: 
+Engagement: Does the game keep players engaged and entertained? If users find the challenge of coding to control the pointer enjoyable, then it's likely to be engaging.
+- I don't know
+
+
+Learning: Is the game educational? By requiring players to write Python code, they're learning or reinforcing programming concepts in a fun and practical way. This could be particularly beneficial for beginners or those looking to improve their coding skills.
+
+
+Difficulty: Is the game appropriately challenging? Striking the right balance between being too easy and too difficult is crucial for keeping players motivated. Gradually increasing the complexity of puzzles or levels can help maintain interest.
+
+
+Feedback: Does the game provide feedback to players? Clear and informative feedback on whether the code executed successfully or not, as well as the outcome of each action (e.g., moving forward, rotating), is important for guiding players and helping them improve.
+
+
+Replayability: Is the game replayable? Adding variety to puzzles or levels, introducing new challenges, or incorporating a scoring system can encourage players to come back for more.
+
+
+Accessibility: Is the game accessible to players of varying skill levels? Providing resources such as hints, tutorials, or documentation on basic Python syntax and the game mechanics can make it more inclusive.
+
+
+User Interface: Is the user interface intuitive and easy to use? A clean and well-designed interface can enhance the overall gaming experience and make it more enjoyable for players.
+
+
+
+
+
+"""
+
+
